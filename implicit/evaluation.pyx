@@ -402,6 +402,8 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
     cdef int u, i, batch_idx
     # precision
     cdef double relevant = 0, pr_div = 0, total = 0
+    # recall
+    cdef double recall = 0, recall_div = 0, relevant_items = 0
     # map
     cdef double mean_ap = 0, ap = 0
     # ndcg
@@ -429,7 +431,7 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
 
     progress = tqdm(total=len(to_generate), disable=not show_progress)
 
-    while start_idx < len(to_generate):
+        while start_idx < len(to_generate):
         batch = to_generate[start_idx: start_idx + batch_size]
         ids, _ = model.recommend(batch, train_user_items[batch], N=K)
         start_idx += batch_size
@@ -442,6 +444,8 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
                     likes.insert(test_indices[i])
 
                 pr_div += fmin(K, likes.size())
+                recall_div += likes.size()  # Update pembagi recall
+
                 ap = 0
                 hit = 0
                 miss = 0
@@ -459,6 +463,10 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
                     else:
                         miss += 1
                         auc += hit
+
+                # Update jumlah item yang relevan yang ditemukan
+                recall += hit
+
                 auc += ((hit + num_pos_items) / 2.0) * (num_neg_items - miss)
                 mean_ap += ap / fmin(K, likes.size())
                 mean_auc += auc / (num_pos_items * num_neg_items)
@@ -469,6 +477,7 @@ def ranking_metrics_at_k(model, train_user_items, test_user_items, int K=10,
     progress.close()
     return {
         "precision": relevant / pr_div,
+        "recall": recall / recall_div,  # Hitung nilai recall
         "map": mean_ap / total,
         "ndcg": ndcg / total,
         "auc": mean_auc / total
